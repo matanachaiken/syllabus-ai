@@ -3,7 +3,7 @@ export const maxDuration = 300
 import { createClient } from '@/utils/supabase/server'
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
-import pdfParse from 'pdf-parse'
+import { extractText } from 'unpdf'
 
 const EVENT_TYPES = ['exam', 'assignment', 'quiz', 'other']
 
@@ -36,7 +36,6 @@ export async function POST(request) {
   }
 
   try {
-    // Download PDF from Supabase Storage
     const storagePath = `${upload.user_id}/${class_id}/${upload.file_name}`
     const { data: fileBlob, error: downloadError } = await supabase.storage
       .from('syllabi')
@@ -44,14 +43,12 @@ export async function POST(request) {
 
     if (downloadError) throw new Error(`Download failed: ${downloadError.message}`)
 
-    // Extract text from PDF
-    const buffer = Buffer.from(await fileBlob.arrayBuffer())
-    const pdfData = await pdfParse(buffer)
-    const text = pdfData.text?.trim()
+    const buffer = await fileBlob.arrayBuffer()
+    const { text: rawText } = await extractText(new Uint8Array(buffer), { mergePages: true })
+    const text = rawText?.trim()
 
     if (!text) throw new Error('PDF appears to be empty or image-only')
 
-    // Call Claude
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
@@ -85,7 +82,6 @@ ${text.slice(0, 60000)}`,
     if (start === -1 || end === -1) throw new Error('Claude returned no JSON object')
     const parsed = JSON.parse(cleaned.slice(start, end + 1))
 
-    // Insert events
     const eventsToInsert = (parsed.events || [])
       .filter(e => e.title)
       .map(e => ({
@@ -102,7 +98,6 @@ ${text.slice(0, 60000)}`,
       await supabase.from('events').insert(eventsToInsert)
     }
 
-    // Insert syllabus_info
     const info = parsed.syllabus_info
     if (info) {
       await supabase.from('syllabus_info').insert({
