@@ -68,6 +68,9 @@ Rules:
 - grading is an object like {"Midterm": "30%", "Final": "40%"}
 - textbooks is an array of strings
 - Include every exam, quiz, assignment, project, and deadline you can find
+- For recurring assignments (e.g. "10 discussion posts due before each class"), create individual entries for each one numbered (Discussion Post 1, Discussion Post 2, etc.) even if exact dates are unknown — set event_date to null in that case
+- For assignments with relative deadlines, include them with null dates rather than skipping them
+- Never skip an assignment just because it lacks an exact date
 
 Syllabus text:
 ${text.slice(0, 60000)}`,
