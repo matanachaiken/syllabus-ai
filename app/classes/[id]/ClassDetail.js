@@ -42,13 +42,23 @@ function groupEventsByMonth(events) {
     groups[key].push(ev)
   })
 
+  // Sort events within each month by date
+  Object.values(groups).forEach(evs => {
+    evs.sort((a, b) => a.event_date.localeCompare(b.event_date))
+  })
+
+  // Sort months chronologically
   const sorted = Object.entries(groups).sort((a, b) => {
     const da = new Date(a[1][0].event_date)
     const db = new Date(b[1][0].event_date)
     return da - db
   })
 
-  if (noDate.length > 0) sorted.push(['No Date', noDate])
+  // Sort no-date events alphabetically by title
+  if (noDate.length > 0) {
+    noDate.sort((a, b) => a.title.localeCompare(b.title))
+    sorted.push(['No Date', noDate])
+  }
   return sorted
 }
 
