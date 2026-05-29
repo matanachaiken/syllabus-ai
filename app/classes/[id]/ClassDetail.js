@@ -26,6 +26,32 @@ function fmt(dateStr) {
   })
 }
 
+// Group events by month/year
+function groupEventsByMonth(events) {
+  const groups = {}
+  const noDate = []
+
+  events.forEach(ev => {
+    if (!ev.event_date) {
+      noDate.push(ev)
+      return
+    }
+    const d = new Date(ev.event_date + 'T12:00:00')
+    const key = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    if (!groups[key]) groups[key] = []
+    groups[key].push(ev)
+  })
+
+  const sorted = Object.entries(groups).sort((a, b) => {
+    const da = new Date(a[1][0].event_date)
+    const db = new Date(b[1][0].event_date)
+    return da - db
+  })
+
+  if (noDate.length > 0) sorted.push(['No Date', noDate])
+  return sorted
+}
+
 export default function ClassDetail({ classData, initialEvents, initialSyllabusInfo, initialUploads }) {
   const supabase = createClient()
 
@@ -76,7 +102,6 @@ export default function ClassDetail({ classData, initialEvents, initialSyllabusI
       setUploads(fresh)
 
       if (!fresh.some(u => u.status === 'processing')) {
-        // Processing finished — refresh events + syllabus_info
         const [evRes, siRes] = await Promise.all([
           supabase.from('events').select('*').eq('class_id', classInfo.id).order('event_date'),
           supabase.from('syllabus_info').select('*').eq('class_id', classInfo.id).maybeSingle(),
@@ -194,6 +219,7 @@ export default function ClassDetail({ classData, initialEvents, initialSyllabusI
   }
 
   const isProcessing = uploads.some(u => u.status === 'processing')
+  const groupedEvents = groupEventsByMonth(events)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -329,7 +355,8 @@ export default function ClassDetail({ classData, initialEvents, initialSyllabusI
               {uploading ? (
                 <div className="text-center py-8">
                   <div className="inline-block w-8 h-8 border-[3px] border-blue-600 border-t-transparent rounded-full animate-spin mb-3" />
-                  <p className="text-sm font-medium text-gray-700">Uploading…</p>
+                  <p className="text-sm font-medium text-gray-700">Uploading & processing with Claude…</p>
+                  <p className="text-xs text-gray-400 mt-1">This can take up to 60 seconds</p>
                 </div>
               ) : (
                 <>
@@ -393,12 +420,6 @@ export default function ClassDetail({ classData, initialEvents, initialSyllabusI
                 </div>
               </div>
             )}
-
-            {isProcessing && (
-              <p className="text-xs text-center text-gray-400">
-                Parsing your syllabus with Claude — checking every few seconds…
-              </p>
-            )}
           </div>
         )}
 
@@ -410,123 +431,125 @@ export default function ClassDetail({ classData, initialEvents, initialSyllabusI
                 <p className="text-gray-400 text-sm">No events yet</p>
                 <p className="text-gray-400 text-sm mt-1">Upload a syllabus or add an event manually</p>
                 <div className="flex justify-center gap-3 mt-4">
-                  <button
-                    onClick={() => setActiveTab('upload')}
-                    className="text-blue-600 text-sm hover:underline"
-                  >
+                  <button onClick={() => setActiveTab('upload')} className="text-blue-600 text-sm hover:underline">
                     Upload syllabus →
                   </button>
-                  <button
-                    onClick={() => setAddingEvent(true)}
-                    className="text-blue-600 text-sm hover:underline"
-                  >
+                  <button onClick={() => setAddingEvent(true)} className="text-blue-600 text-sm hover:underline">
                     Add event →
                   </button>
                 </div>
               </div>
             ) : (
-              <>
-                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      <tr>
-                        <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide w-2/5">Title</th>
-                        <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Date</th>
-                        <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Type</th>
-                        <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Notes</th>
-                        <th className="px-5 py-3 w-24"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {events.map(ev => (
-                        <tr key={ev.id} className="hover:bg-gray-50 transition-colors">
-                          {editingEventId === ev.id ? (
-                            <>
-                              <td className="px-5 py-3">
-                                <input
-                                  value={eventEdit.title}
-                                  onChange={e => setEventEdit({ ...eventEdit, title: e.target.value })}
-                                  className="w-full border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                />
-                              </td>
-                              <td className="px-5 py-3">
-                                <input
-                                  type="date"
-                                  value={eventEdit.event_date}
-                                  onChange={e => setEventEdit({ ...eventEdit, event_date: e.target.value })}
-                                  className="border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                />
-                              </td>
-                              <td className="px-5 py-3">
-                                <select
-                                  value={eventEdit.type}
-                                  onChange={e => setEventEdit({ ...eventEdit, type: e.target.value })}
-                                  className="border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                >
-                                  {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                                </select>
-                              </td>
-                              <td className="px-5 py-3">
-                                <input
-                                  value={eventEdit.notes}
-                                  onChange={e => setEventEdit({ ...eventEdit, notes: e.target.value })}
-                                  className="w-full border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                  placeholder="Optional"
-                                />
-                              </td>
-                              <td className="px-5 py-3">
-                                <div className="flex gap-2 justify-end">
-                                  <button
-                                    onClick={saveEventEdit}
-                                    disabled={savingEvent}
-                                    className="text-blue-600 hover:underline disabled:opacity-50"
-                                  >
-                                    {savingEvent ? 'Saving…' : 'Save'}
-                                  </button>
-                                  <button
-                                    onClick={() => setEditingEventId(null)}
-                                    className="text-gray-400 hover:text-gray-600"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </td>
-                            </>
-                          ) : (
-                            <>
-                              <td className="px-5 py-4 font-medium text-gray-800">{ev.title}</td>
-                              <td className="px-5 py-4 text-gray-600">{fmt(ev.event_date)}</td>
-                              <td className="px-5 py-4">
-                                <span className={`inline-block text-xs px-2 py-1 rounded-full font-medium ${TYPE_STYLES[ev.type] || TYPE_STYLES.other}`}>
-                                  {ev.type}
-                                </span>
-                              </td>
-                              <td className="px-5 py-4 text-gray-500 max-w-xs truncate">{ev.notes || '—'}</td>
-                              <td className="px-5 py-4">
-                                <div className="flex gap-3 justify-end">
-                                  <button
-                                    onClick={() => startEditEvent(ev)}
-                                    className="text-gray-400 hover:text-blue-600 transition-colors"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => deleteEvent(ev.id)}
-                                    className="text-gray-400 hover:text-red-500 transition-colors"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              </td>
-                            </>
-                          )}
-                        </tr>
-                      ))}
+              <div className="space-y-6">
+                {/* Grouped events */}
+                {groupedEvents.map(([monthLabel, monthEvents]) => (
+                  <div key={monthLabel}>
+                    {/* Month header */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-widest">
+                        {monthLabel}
+                      </span>
+                      <div className="flex-1 h-px bg-gray-200" />
+                      <span className="text-xs text-gray-400">{monthEvents.length} event{monthEvents.length !== 1 ? 's' : ''}</span>
+                    </div>
 
-                      {/* ── Inline add-event row ── */}
-                      {addingEvent && (
+                    {/* Events in this month */}
+                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide w-2/5">Title</th>
+                            <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Date</th>
+                            <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Type</th>
+                            <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Notes</th>
+                            <th className="px-5 py-3 w-24"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {monthEvents.map(ev => (
+                            <tr key={ev.id} className="hover:bg-gray-50 transition-colors">
+                              {editingEventId === ev.id ? (
+                                <>
+                                  <td className="px-5 py-3">
+                                    <input
+                                      value={eventEdit.title}
+                                      onChange={e => setEventEdit({ ...eventEdit, title: e.target.value })}
+                                      className="w-full border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    />
+                                  </td>
+                                  <td className="px-5 py-3">
+                                    <input
+                                      type="date"
+                                      value={eventEdit.event_date}
+                                      onChange={e => setEventEdit({ ...eventEdit, event_date: e.target.value })}
+                                      className="border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    />
+                                  </td>
+                                  <td className="px-5 py-3">
+                                    <select
+                                      value={eventEdit.type}
+                                      onChange={e => setEventEdit({ ...eventEdit, type: e.target.value })}
+                                      className="border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    >
+                                      {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                  </td>
+                                  <td className="px-5 py-3">
+                                    <input
+                                      value={eventEdit.notes}
+                                      onChange={e => setEventEdit({ ...eventEdit, notes: e.target.value })}
+                                      className="w-full border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                      placeholder="Optional"
+                                    />
+                                  </td>
+                                  <td className="px-5 py-3">
+                                    <div className="flex gap-2 justify-end">
+                                      <button onClick={saveEventEdit} disabled={savingEvent} className="text-blue-600 hover:underline disabled:opacity-50">
+                                        {savingEvent ? 'Saving…' : 'Save'}
+                                      </button>
+                                      <button onClick={() => setEditingEventId(null)} className="text-gray-400 hover:text-gray-600">
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className="px-5 py-4 font-medium text-gray-800">{ev.title}</td>
+                                  <td className="px-5 py-4 text-gray-600">{fmt(ev.event_date)}</td>
+                                  <td className="px-5 py-4">
+                                    <span className={`inline-block text-xs px-2 py-1 rounded-full font-medium ${TYPE_STYLES[ev.type] || TYPE_STYLES.other}`}>
+                                      {ev.type}
+                                    </span>
+                                  </td>
+                                  <td className="px-5 py-4 text-gray-500 max-w-xs truncate">{ev.notes || '—'}</td>
+                                  <td className="px-5 py-4">
+                                    <div className="flex gap-3 justify-end">
+                                      <button onClick={() => startEditEvent(ev)} className="text-gray-400 hover:text-blue-600 transition-colors">
+                                        Edit
+                                      </button>
+                                      <button onClick={() => deleteEvent(ev.id)} className="text-gray-400 hover:text-red-500 transition-colors">
+                                        Delete
+                                      </button>
+                                    </div>
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add event row */}
+                {addingEvent && (
+                  <div className="bg-white rounded-xl border border-blue-200 overflow-hidden">
+                    <table className="w-full text-sm">
+                      <tbody>
                         <tr className="bg-blue-50">
-                          <td className="px-5 py-3">
+                          <td className="px-5 py-3 w-2/5">
                             <input
                               autoFocus
                               value={newEvent.title}
@@ -562,36 +585,26 @@ export default function ClassDetail({ classData, initialEvents, initialSyllabusI
                           </td>
                           <td className="px-5 py-3">
                             <div className="flex gap-2 justify-end">
-                              <button
-                                onClick={addEvent}
-                                disabled={savingNew || !newEvent.title.trim()}
-                                className="text-blue-600 hover:underline disabled:opacity-50"
-                              >
+                              <button onClick={addEvent} disabled={savingNew || !newEvent.title.trim()} className="text-blue-600 hover:underline disabled:opacity-50">
                                 {savingNew ? 'Adding…' : 'Add'}
                               </button>
-                              <button
-                                onClick={() => setAddingEvent(false)}
-                                className="text-gray-400 hover:text-gray-600"
-                              >
+                              <button onClick={() => setAddingEvent(false)} className="text-gray-400 hover:text-gray-600">
                                 Cancel
                               </button>
                             </div>
                           </td>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
                 {!addingEvent && (
-                  <button
-                    onClick={() => setAddingEvent(true)}
-                    className="mt-3 text-sm text-blue-600 hover:underline"
-                  >
+                  <button onClick={() => setAddingEvent(true)} className="text-sm text-blue-600 hover:underline">
                     + Add event
                   </button>
                 )}
-              </>
+              </div>
             )}
           </div>
         )}
@@ -602,10 +615,7 @@ export default function ClassDetail({ classData, initialEvents, initialSyllabusI
             {!syllabusInfo ? (
               <div className="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center">
                 <p className="text-gray-400 text-sm">No syllabus info extracted yet</p>
-                <button
-                  onClick={() => setActiveTab('upload')}
-                  className="mt-4 text-blue-600 text-sm hover:underline"
-                >
+                <button onClick={() => setActiveTab('upload')} className="mt-4 text-blue-600 text-sm hover:underline">
                   Upload syllabus →
                 </button>
               </div>
@@ -616,7 +626,6 @@ export default function ClassDetail({ classData, initialEvents, initialSyllabusI
                     <p className="text-sm text-gray-600 leading-relaxed">{syllabusInfo.course_description}</p>
                   </InfoSection>
                 )}
-
                 {syllabusInfo.grading && Object.keys(syllabusInfo.grading).length > 0 && (
                   <InfoSection title="Grading">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1">
@@ -629,19 +638,16 @@ export default function ClassDetail({ classData, initialEvents, initialSyllabusI
                     </div>
                   </InfoSection>
                 )}
-
                 {syllabusInfo.office_hours && (
                   <InfoSection title="Office Hours">
                     <p className="text-sm text-gray-600">{syllabusInfo.office_hours}</p>
                   </InfoSection>
                 )}
-
                 {syllabusInfo.policies && (
                   <InfoSection title="Policies">
                     <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">{syllabusInfo.policies}</p>
                   </InfoSection>
                 )}
-
                 {syllabusInfo.textbooks && syllabusInfo.textbooks.length > 0 && (
                   <InfoSection title="Textbooks">
                     <ul className="space-y-1 list-disc list-inside">
