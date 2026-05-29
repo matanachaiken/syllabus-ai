@@ -17,7 +17,17 @@ export default async function DashboardPage() {
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
         <h1 className="text-lg font-semibold text-gray-800">📚 SyllabusAI</h1>
-        <span className="text-sm text-gray-500">{user.email}</span>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-500">{user.email}</span>
+          <form action="/api/signout" method="POST">
+            <button
+              type="submit"
+              className="text-sm text-red-500 hover:text-red-700 font-medium"
+            >
+              Sign out
+            </button>
+          </form>
+        </div>
       </nav>
 
       <div className="max-w-4xl mx-auto px-6 py-10">
