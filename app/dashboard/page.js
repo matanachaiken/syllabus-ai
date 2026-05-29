@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import SignOutButton from './SignOutButton'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -19,14 +20,7 @@ export default async function DashboardPage() {
         <h1 className="text-lg font-semibold text-gray-800">📚 SyllabusAI</h1>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-500">{user.email}</span>
-          <form action="/api/signout" method="POST">
-            <button
-              type="submit"
-              className="text-sm text-red-500 hover:text-red-700 font-medium"
-            >
-              Sign out
-            </button>
-          </form>
+          <SignOutButton />
         </div>
       </nav>
 
