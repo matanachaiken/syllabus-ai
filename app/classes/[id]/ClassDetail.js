@@ -292,20 +292,32 @@ export default function ClassDetail({ classData, initialEvents, initialSyllabusI
                   )}
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  setClassEdit({
-                    name: classInfo.name,
-                    course_code: classInfo.course_code || '',
-                    professor: classInfo.professor || '',
-                    semester: classInfo.semester || '',
-                  })
-                  setEditingClass(true)
-                }}
-                className="text-sm text-gray-400 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 shrink-0"
-              >
-                Edit
-              </button>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  onClick={() => {
+                    setClassEdit({
+                      name: classInfo.name,
+                      course_code: classInfo.course_code || '',
+                      professor: classInfo.professor || '',
+                      semester: classInfo.semester || '',
+                    })
+                    setEditingClass(true)
+                  }}
+                  className="text-sm text-gray-400 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!confirm('Delete this class? This will remove all uploads, events, and syllabus info.')) return
+                    const res = await fetch(`/api/classes/${classInfo.id}`, { method: 'DELETE' })
+                    if (res.ok) window.location.href = '/dashboard'
+                  }}
+                  className="text-sm text-red-400 hover:text-red-600 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           )}
         </div>
