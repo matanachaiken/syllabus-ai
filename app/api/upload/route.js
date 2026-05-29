@@ -1,9 +1,10 @@
+export const maxDuration = 60
+
 import { createClient } from '@/utils/supabase/server'
 import { NextResponse } from 'next/server'
 
 export async function POST(request) {
   const supabase = await createClient()
-
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
@@ -16,7 +17,6 @@ export async function POST(request) {
 
   const file = formData.get('file')
   const classId = formData.get('class_id')
-
   if (!file || !classId) {
     return NextResponse.json({ error: 'Missing file or class_id' }, { status: 400 })
   }
@@ -50,16 +50,18 @@ export async function POST(request) {
     return NextResponse.json({ error: insertError.message }, { status: 500 })
   }
 
-  // Fire-and-forget: trigger processing without blocking the response
-  const cookie = request.headers.get('cookie') || ''
-  fetch(new URL('/api/process-syllabus', request.url).toString(), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Cookie: cookie,
-    },
-    body: JSON.stringify({ upload_id: uploadRecord.id, class_id: classId }),
-  }).catch(() => {})
+  try {
+    await fetch(new URL('/api/process-syllabus', request.url).toString(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: request.headers.get('cookie') || '',
+      },
+      body: JSON.stringify({ upload_id: uploadRecord.id, class_id: classId }),
+    })
+  } catch (e) {
+    console.error('Processing error:', e)
+  }
 
   return NextResponse.json({ data: uploadRecord })
 }
