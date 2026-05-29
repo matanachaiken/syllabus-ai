@@ -54,9 +54,9 @@ function groupEventsByMonth(events) {
     return da - db
   })
 
-  // Sort no-date events alphabetically by title
+  // Sort no-date events by natural title order (handles "Post 1", "Post 2"... "Post 10")
   if (noDate.length > 0) {
-    noDate.sort((a, b) => a.title.localeCompare(b.title))
+    noDate.sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' }))
     sorted.push(['No Date', noDate])
   }
   return sorted
