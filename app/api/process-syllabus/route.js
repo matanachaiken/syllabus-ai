@@ -82,6 +82,10 @@ ${text.slice(0, 60000)}`,
     if (start === -1 || end === -1) throw new Error('Claude returned no JSON object')
     const parsed = JSON.parse(cleaned.slice(start, end + 1))
 
+    // Clear old data for this class before inserting fresh data
+    await supabase.from('events').delete().eq('class_id', class_id)
+    await supabase.from('syllabus_info').delete().eq('class_id', class_id)
+
     const eventsToInsert = (parsed.events || [])
       .filter(e => e.title)
       .map(e => ({
